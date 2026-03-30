@@ -300,33 +300,25 @@ def calc_kelly_criterion(pnl_values):
 def apply_kelly_sizing(pnl_values, kelly_fraction, kelly_pct):
     """
     Simulate equity curve with Kelly-based position sizing.
-    Each trade outcome is treated as win (+1 unit) or loss (-1 unit),
-    risking kelly_pct of current equity per trade.
-    Win amount = risk * (avg_win/avg_loss), Loss amount = risk * 1.
+    Uses fixed-fraction of STARTING equity to keep results in realistic range.
+    Each trade's actual P&L is scaled by (kelly_pct / base_risk).
     """
     n = len(pnl_values)
+    starting_equity = 10000.0
     equity = np.zeros(n + 1)
-    equity[0] = 10000.0  # starting equity
+    equity[0] = starting_equity
 
-    wins = pnl_values[pnl_values > 0]
-    losses = pnl_values[pnl_values < 0]
-
-    if len(wins) == 0 or len(losses) == 0:
+    # Scale trades proportionally to kelly fraction
+    # Normalize: what fraction of equity does each trade's P&L represent?
+    avg_abs_pnl = np.mean(np.abs(pnl_values))
+    if avg_abs_pnl == 0:
         return equity[1:]
 
-    avg_win = np.mean(wins)
-    avg_loss = np.abs(np.mean(losses))
-    payoff_ratio = avg_win / avg_loss
+    # Scale factor: kelly_pct determines how much of equity each "unit" of risk is
+    scale = (kelly_pct * starting_equity) / avg_abs_pnl
 
     for i in range(n):
-        risk = equity[i] * abs(kelly_pct)
-        if pnl_values[i] > 0:
-            equity[i + 1] = equity[i] + risk * payoff_ratio
-        elif pnl_values[i] < 0:
-            equity[i + 1] = equity[i] - risk
-        else:
-            equity[i + 1] = equity[i]
-
+        equity[i + 1] = equity[i] + pnl_values[i] * scale
         if equity[i + 1] <= 0:
             equity[i + 1:] = 0
             break

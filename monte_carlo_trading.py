@@ -247,15 +247,21 @@ def read_uploaded_file(uploaded_file):
         return None
 
 
-def run_monte_carlo(pnl_values, n_simulations):
-    """Run Monte Carlo simulations using full random permutations."""
+def run_monte_carlo(pnl_values, n_simulations, method="resample"):
+    """Run Monte Carlo simulations.
+    method='permutation': shuffle without replacement (same final P&L)
+    method='resample': bootstrap with replacement (realistic variance)
+    """
     n_trades = len(pnl_values)
     pnl_array = np.array(pnl_values, dtype=np.float64)
     all_curves = np.empty((n_simulations, n_trades), dtype=np.float64)
 
     for i in range(n_simulations):
-        shuffled = np.random.permutation(pnl_array)
-        all_curves[i] = np.cumsum(shuffled)
+        if method == "permutation":
+            sampled = np.random.permutation(pnl_array)
+        else:  # resample with replacement
+            sampled = np.random.choice(pnl_array, size=n_trades, replace=True)
+        all_curves[i] = np.cumsum(sampled)
 
     original_curve = np.cumsum(pnl_array)
     avg_curve = np.mean(all_curves, axis=0)
@@ -416,11 +422,11 @@ if df is not None and pnl_column is not None:
     # TAB 1: MONTE CARLO
     # =====================================================================
     with tab_mc:
-        st.markdown('<div class="section-title">Monte Carlo Permutation Analysis</div>',
+        st.markdown('<div class="section-title">Monte Carlo Simulation Analysis</div>',
                     unsafe_allow_html=True)
 
-        col_nsim, col_bundle, col_spacer2, col_run = st.columns(
-            [2, 3, 1, 2], gap="medium"
+        col_nsim, col_method, col_bundle, col_run = st.columns(
+            [2, 2, 3, 2], gap="medium"
         )
 
         with col_nsim:
@@ -431,6 +437,16 @@ if df is not None and pnl_column is not None:
                 value=1000,
                 step=100,
             )
+
+        with col_method:
+            mc_method = st.selectbox(
+                "Simulation Method",
+                ["Resample (with replacement)", "Permutation (shuffle only)"],
+                index=0,
+                help="Resample: bootstrap sampling creates realistic variance in outcomes. "
+                     "Permutation: shuffles trade order, final P&L stays the same.",
+            )
+            method_key = "resample" if "Resample" in mc_method else "permutation"
 
         with col_bundle:
             bundle_toggle = False
@@ -454,7 +470,7 @@ if df is not None and pnl_column is not None:
             else:
                 with st.spinner("Running simulations..."):
                     original_curve, all_curves, avg_curve = run_monte_carlo(
-                        pnl_values, int(n_simulations)
+                        pnl_values, int(n_simulations), method=method_key
                     )
 
                 n_trades = len(pnl_values)
@@ -463,6 +479,25 @@ if df is not None and pnl_column is not None:
                 # --- Build Chart ---
                 fig = go.Figure()
 
+                # Colorful line palette for simulations
+                sim_colors = [
+                    "rgba(255, 107, 107, {a})",  # red
+                    "rgba(255, 159, 67, {a})",   # orange
+                    "rgba(254, 202, 87, {a})",   # yellow
+                    "rgba(46, 213, 115, {a})",   # green
+                    "rgba(30, 196, 179, {a})",   # teal
+                    "rgba(69, 170, 242, {a})",   # light blue
+                    "rgba(140, 122, 230, {a})",  # purple
+                    "rgba(232, 67, 147, {a})",   # pink
+                    "rgba(162, 210, 81, {a})",   # lime
+                    "rgba(0, 210, 211, {a})",    # cyan
+                    "rgba(204, 142, 53, {a})",   # gold
+                    "rgba(119, 190, 29, {a})",   # bright green
+                    "rgba(196, 113, 237, {a})",  # violet
+                    "rgba(255, 135, 135, {a})",  # salmon
+                    "rgba(72, 219, 251, {a})",   # sky
+                ]
+
                 if bundle_toggle and n_simulations > 10:
                     bundle_size = 10
                     n_bundles = n_simulations // bundle_size
@@ -470,19 +505,21 @@ if df is not None and pnl_column is not None:
                         bundled = np.mean(
                             all_curves[b * bundle_size: (b + 1) * bundle_size], axis=0
                         )
+                        c = sim_colors[b % len(sim_colors)].format(a=0.35)
                         fig.add_trace(go.Scattergl(
                             x=x_axis, y=bundled, mode="lines",
-                            line=dict(color="rgba(160, 130, 240, 0.15)", width=1),
+                            line=dict(color=c, width=1.5),
                             hoverinfo="skip", showlegend=False,
                         ))
                 else:
                     max_plot = min(n_simulations, 2000)
                     indices = (np.random.choice(n_simulations, max_plot, replace=False)
                                if n_simulations > max_plot else np.arange(n_simulations))
-                    for i in indices:
+                    for idx_pos, i in enumerate(indices):
+                        c = sim_colors[idx_pos % len(sim_colors)].format(a=0.25)
                         fig.add_trace(go.Scattergl(
                             x=x_axis, y=all_curves[i], mode="lines",
-                            line=dict(color="rgba(160, 130, 240, 0.08)", width=0.8),
+                            line=dict(color=c, width=1.5),
                             hoverinfo="skip", showlegend=False,
                         ))
 
@@ -582,7 +619,16 @@ if df is not None and pnl_column is not None:
                 avg_min_eq = np.mean(all_min_equity)
 
                 orig_class = "positive" if final_original >= 0 else "negative"
+                avg_class = "positive" if final_avg >= 0 else "negative"
 
+                # Final P&L stats across sims
+                final_values = all_curves[:, -1]
+                worst_final = np.min(final_values)
+                best_final = np.max(final_values)
+                worst_final_class = "positive" if worst_final >= 0 else "negative"
+                best_final_class = "positive" if best_final >= 0 else "negative"
+
+                # Row 1: P&L results
                 c1, c2, c3, c4, c5 = st.columns(5)
 
                 with c1:
@@ -595,25 +641,54 @@ if df is not None and pnl_column is not None:
                     st.markdown(f"""
                     <div class="metric-card">
                         <div class="metric-label">Original Final P&L</div>
-                        <div class="metric-value {orig_class}">{final_original:,.2f}</div>
+                        <div class="metric-value {orig_class}">{fmt_human(final_original)}</div>
                     </div>""", unsafe_allow_html=True)
                 with c3:
                     st.markdown(f"""
                     <div class="metric-card">
-                        <div class="metric-label">Original Max Drawdown</div>
-                        <div class="metric-value negative">{orig_max_dd:,.2f}</div>
+                        <div class="metric-label">Avg Final P&L</div>
+                        <div class="metric-value {avg_class}">{fmt_human(final_avg)}</div>
                     </div>""", unsafe_allow_html=True)
                 with c4:
                     st.markdown(f"""
                     <div class="metric-card">
-                        <div class="metric-label">Avg Max Drawdown</div>
-                        <div class="metric-value negative">{avg_dd:,.2f}</div>
+                        <div class="metric-label">Best Final P&L</div>
+                        <div class="metric-value {best_final_class}">{fmt_human(best_final)}</div>
                     </div>""", unsafe_allow_html=True)
                 with c5:
                     st.markdown(f"""
                     <div class="metric-card">
-                        <div class="metric-label">Worst Max Drawdown</div>
-                        <div class="metric-value negative">{worst_dd:,.2f}</div>
+                        <div class="metric-label">Worst Final P&L</div>
+                        <div class="metric-value {worst_final_class}">{fmt_human(worst_final)}</div>
+                    </div>""", unsafe_allow_html=True)
+
+                # Row 2: Drawdown results
+                st.markdown("<br>", unsafe_allow_html=True)
+                d1, d2, d3, d4 = st.columns(4)
+
+                with d1:
+                    st.markdown(f"""
+                    <div class="metric-card">
+                        <div class="metric-label">Original Max Drawdown</div>
+                        <div class="metric-value negative">{fmt_human(orig_max_dd)}</div>
+                    </div>""", unsafe_allow_html=True)
+                with d2:
+                    st.markdown(f"""
+                    <div class="metric-card">
+                        <div class="metric-label">Avg Max Drawdown</div>
+                        <div class="metric-value negative">{fmt_human(avg_dd)}</div>
+                    </div>""", unsafe_allow_html=True)
+                with d3:
+                    st.markdown(f"""
+                    <div class="metric-card">
+                        <div class="metric-label">Best Drawdown</div>
+                        <div class="metric-value negative">{fmt_human(best_dd)}</div>
+                    </div>""", unsafe_allow_html=True)
+                with d4:
+                    st.markdown(f"""
+                    <div class="metric-card">
+                        <div class="metric-label">Worst Drawdown</div>
+                        <div class="metric-value negative">{fmt_human(worst_dd)}</div>
                     </div>""", unsafe_allow_html=True)
 
                 # --- Distribution Section ---
@@ -623,16 +698,24 @@ if df is not None and pnl_column is not None:
                     unsafe_allow_html=True,
                 )
 
+                if method_key == "permutation":
+                    dist_text = (
+                        '<strong>Why drawdowns?</strong> Permutation shuffling preserves '
+                        'all trades (just reorders them), so every simulation ends at the same '
+                        'final P&L. What changes is the <em>path</em> — how deep the equity '
+                        'dips along the way. A tight distribution means your strategy is robust '
+                        'to sequencing; a wide spread means luck in trade ordering mattered.'
+                    )
+                else:
+                    dist_text = (
+                        '<strong>Resampling with replacement</strong> draws trades randomly '
+                        'from your history, allowing repeats. This creates realistic variance '
+                        'in both the path <em>and</em> final outcome. The drawdown distribution '
+                        'below shows the range of max drawdowns across all simulations — giving '
+                        'you a realistic picture of the risk your strategy carries.'
+                    )
                 st.markdown(
-                    '<div class="info-box">'
-                    '<strong>Why drawdowns?</strong> Since permutation shuffling preserves '
-                    'all trades (just reorders them), every simulation ends at the same '
-                    'final P&L. What changes is the <em>path</em> — how deep the equity '
-                    'dips along the way. The max drawdown distribution shows the range of '
-                    'pain you could have experienced with the same trades in a different '
-                    'order. A tight distribution means your strategy is robust to sequencing; '
-                    'a wide spread means luck in trade ordering played a significant role.'
-                    '</div>',
+                    f'<div class="info-box">{dist_text}</div>',
                     unsafe_allow_html=True,
                 )
 

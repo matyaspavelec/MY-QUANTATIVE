@@ -26,7 +26,7 @@ html, body, [class*="css"] {
 }
 .stApp {
     background-color: #111317;
-    color: #d0d4dc;
+    color: #e8eaef;
 }
 h1, h2, h3, h4, h5, h6 {
     font-family: 'Space Grotesk', sans-serif;
@@ -73,7 +73,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 .metric-label {
     font-size: 11px;
-    color: #6b7280;
+    color: #9ca3af;
     text-transform: uppercase;
     letter-spacing: 1.8px;
     margin-bottom: 8px;
@@ -95,7 +95,7 @@ h1, h2, h3, h4, h5, h6 {
     border-bottom: 1px solid #22252b;
     font-size: 14px;
 }
-.stat-label { color: #6b7280; }
+.stat-label { color: #9ca3af; }
 .stat-value {
     font-family: 'JetBrains Mono', monospace;
     color: #d0d4dc;
@@ -432,6 +432,25 @@ if df is not None and pnl_column is not None:
                 # --- Build Chart ---
                 fig = go.Figure()
 
+                # Color palette for simulation lines (like reference image)
+                sim_colors = [
+                    "rgba(255, 107, 107, {a})",  # red
+                    "rgba(255, 159, 67, {a})",   # orange
+                    "rgba(254, 202, 87, {a})",   # yellow
+                    "rgba(46, 213, 115, {a})",   # green
+                    "rgba(30, 196, 179, {a})",   # teal
+                    "rgba(69, 170, 242, {a})",   # light blue
+                    "rgba(140, 122, 230, {a})",  # purple
+                    "rgba(232, 67, 147, {a})",   # pink
+                    "rgba(162, 210, 81, {a})",   # lime
+                    "rgba(0, 210, 211, {a})",    # cyan
+                    "rgba(204, 142, 53, {a})",   # gold
+                    "rgba(119, 190, 29, {a})",   # bright green
+                    "rgba(196, 113, 237, {a})",  # violet
+                    "rgba(255, 135, 135, {a})",  # salmon
+                    "rgba(72, 219, 251, {a})",   # sky
+                ]
+
                 if bundle_toggle and n_simulations > 10:
                     bundle_size = 10
                     n_bundles = n_simulations // bundle_size
@@ -439,54 +458,58 @@ if df is not None and pnl_column is not None:
                         bundled = np.mean(
                             all_curves[b * bundle_size: (b + 1) * bundle_size], axis=0
                         )
+                        c = sim_colors[b % len(sim_colors)].format(a=0.25)
                         fig.add_trace(go.Scattergl(
                             x=x_axis, y=bundled, mode="lines",
-                            line=dict(color="rgba(160, 130, 240, 0.15)", width=1),
+                            line=dict(color=c, width=1),
                             hoverinfo="skip", showlegend=False,
                         ))
                 else:
                     max_plot = min(n_simulations, 2000)
                     indices = (np.random.choice(n_simulations, max_plot, replace=False)
                                if n_simulations > max_plot else np.arange(n_simulations))
-                    for i in indices:
+                    for idx_pos, i in enumerate(indices):
+                        c = sim_colors[idx_pos % len(sim_colors)].format(a=0.15)
                         fig.add_trace(go.Scattergl(
                             x=x_axis, y=all_curves[i], mode="lines",
-                            line=dict(color="rgba(160, 130, 240, 0.08)", width=0.8),
+                            line=dict(color=c, width=0.8),
                             hoverinfo="skip", showlegend=False,
                         ))
 
-                # Original curve
+                # Original curve (bold dark blue like reference)
                 fig.add_trace(go.Scattergl(
                     x=x_axis, y=original_curve, mode="lines",
                     name="Original Sequence",
-                    line=dict(color="#60a5fa", width=3),
+                    line=dict(color="#1a56db", width=4),
                 ))
 
-                # Average curve
+                # Average curve (white, thickest)
                 fig.add_trace(go.Scattergl(
                     x=x_axis, y=avg_curve, mode="lines",
                     name="Average (all simulations)",
-                    line=dict(color="#ffffff", width=3.5),
+                    line=dict(color="#ffffff", width=4),
                 ))
 
                 fig.update_layout(
-                    plot_bgcolor="#1a1d23",
+                    plot_bgcolor="#f5f5f5",
                     paper_bgcolor="#111317",
-                    font=dict(family="Space Grotesk, sans-serif", color="#9ca3af",
+                    font=dict(family="Space Grotesk, sans-serif", color="#ffffff",
                               size=13),
                     height=680,
                     margin=dict(l=60, r=30, t=50, b=60),
                     xaxis=dict(
-                        title="Trade Number", gridcolor="#22252b",
-                        zerolinecolor="#22252b", title_font=dict(size=14),
+                        title="Trade Number", gridcolor="#ddd",
+                        zerolinecolor="#bbb", title_font=dict(size=14, color="#ffffff"),
+                        tickfont=dict(color="#ffffff"),
                     ),
                     yaxis=dict(
-                        title="Cumulative P&L", gridcolor="#22252b",
-                        zerolinecolor="#3a3f4b", title_font=dict(size=14),
+                        title="Cumulative P&L", gridcolor="#ddd",
+                        zerolinecolor="#999", title_font=dict(size=14, color="#ffffff"),
+                        tickfont=dict(color="#ffffff"),
                     ),
                     legend=dict(
                         orientation="h", yanchor="bottom", y=1.02,
-                        xanchor="center", x=0.5, font=dict(size=13),
+                        xanchor="center", x=0.5, font=dict(size=13, color="#ffffff"),
                         bgcolor="rgba(0,0,0,0)",
                     ),
                     hovermode="x unified",
@@ -611,9 +634,9 @@ if df is not None and pnl_column is not None:
                         marker_line=dict(color="rgba(160, 130, 240, 0.8)", width=0.5),
                     ))
                     fig_hist.add_vline(
-                        x=orig_max_dd, line_color="#60a5fa", line_width=2,
+                        x=orig_max_dd, line_color="#1a56db", line_width=2,
                         annotation_text="Your Drawdown",
-                        annotation_font=dict(color="#60a5fa", size=12),
+                        annotation_font=dict(color="#1a56db", size=12),
                     )
                     fig_hist.add_vline(
                         x=avg_dd, line_color="#ffffff", line_width=2,

@@ -318,6 +318,23 @@ def apply_kelly_sizing(pnl_values, kelly_fraction, kelly_pct):
     return equity[1:]
 
 
+def fmt_human(value):
+    """Format large numbers into readable estimates like $2.3M, $450K, etc."""
+    neg = value < 0
+    v = abs(value)
+    if v >= 1_000_000_000:
+        s = f"${v / 1_000_000_000:,.1f}B"
+    elif v >= 1_000_000:
+        s = f"${v / 1_000_000:,.1f}M"
+    elif v >= 10_000:
+        s = f"${v / 1_000:,.0f}K"
+    elif v >= 1_000:
+        s = f"${v / 1_000:,.1f}K"
+    else:
+        s = f"${v:,.0f}"
+    return f"-{s}" if neg else s
+
+
 def get_file_extension(filename):
     """Get the file extension from filename."""
     if "." in filename:
@@ -739,13 +756,13 @@ if df is not None and pnl_column is not None:
             st.markdown(f"""
             <div class="metric-card">
                 <div class="metric-label">Avg Win</div>
-                <div class="metric-value positive">{avg_win:,.2f}</div>
+                <div class="metric-value positive">{fmt_human(avg_win)}</div>
             </div>""", unsafe_allow_html=True)
         with kc3:
             st.markdown(f"""
             <div class="metric-card">
                 <div class="metric-label">Avg Loss</div>
-                <div class="metric-value negative">-{avg_loss:,.2f}</div>
+                <div class="metric-value negative">-{fmt_human(avg_loss)}</div>
             </div>""", unsafe_allow_html=True)
         with kc4:
             st.markdown(f"""
@@ -853,21 +870,29 @@ if df is not None and pnl_column is not None:
 
                     growth_color = "#4ade80" if growth >= 0 else "#f87171"
 
+                    # Format growth as human-readable
+                    if abs(growth) >= 10000:
+                        growth_str = f"{growth / 1000:+,.0f}K%"
+                    elif abs(growth) >= 1000:
+                        growth_str = f"{growth / 1000:+,.1f}K%"
+                    else:
+                        growth_str = f"{growth:+,.0f}%"
+
                     with cols[idx]:
                         st.markdown(f"""
                         <div class="kelly-card">
                             <div class="kelly-header" style="color: {colors[name]};">{name}</div>
                             <div class="kelly-sub">Risk {fraction * 100:.1f}% per trade</div>
-                            <div class="kelly-val" style="color: {growth_color};">{growth:+,.1f}%</div>
+                            <div class="kelly-val" style="color: {growth_color};">{growth_str}</div>
                             <div class="kelly-unit">Total Return</div>
                             <div style="margin-top: 14px;">
                                 <div class="stat-row">
                                     <span class="stat-label">Final Equity</span>
-                                    <span class="stat-value">${final_eq:,.0f}</span>
+                                    <span class="stat-value">{fmt_human(final_eq)}</span>
                                 </div>
                                 <div class="stat-row" style="border-bottom: none;">
                                     <span class="stat-label">Max Drawdown</span>
-                                    <span class="stat-value" style="color: #f87171;">${dd:,.0f}</span>
+                                    <span class="stat-value" style="color: #f87171;">{fmt_human(dd)}</span>
                                 </div>
                             </div>
                         </div>

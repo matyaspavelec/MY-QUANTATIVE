@@ -1,0 +1,43 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python \"C:\\\\Users\\\\Hlavni\\\\AppData\\\\Roaming\\\\Claude\\\\local-agent-mode-sessions\\\\skills-plugin\\\\d1cfbd6f-a950-4a70-8591-703f056b34ee\\\\a9f65b5e-a288-4fc6-a318-edda553d1d15\\\\skills\\\\docx\\\\scripts\\\\office\\\\unpack.py\" \"C:\\\\Users\\\\Hlavni\\\\Downloads\\\\zadani_nadace_opravene.docx\" \"/tmp/zadani_unpacked/\")",
+      "Bash(python3 \"C:\\\\Users\\\\Hlavni\\\\AppData\\\\Roaming\\\\Claude\\\\local-agent-mode-sessions\\\\skills-plugin\\\\d1cfbd6f-a950-4a70-8591-703f056b34ee\\\\a9f65b5e-a288-4fc6-a318-edda553d1d15\\\\skills\\\\docx\\\\scripts\\\\office\\\\unpack.py\" \"C:\\\\Users\\\\Hlavni\\\\Downloads\\\\zadani_nadace_opravene.docx\" \"/tmp/zadani_unpacked/\")",
+      "Bash(pandoc \"C:\\\\Users\\\\Hlavni\\\\Downloads\\\\zadani_nadace_opravene.docx\" -t markdown)",
+      "Bash(pip install:*)",
+      "Bash(/c/Users/Hlavni/AppData/Local/Microsoft/WindowsApps/python3 -c \":*)",
+      "WebSearch",
+      "WebFetch(domain:www.shloked.com)",
+      "WebFetch(domain:poke.com)",
+      "WebFetch(domain:handyai.substack.com)",
+      "WebFetch(domain:docs.vapi.ai)",
+      "WebFetch(domain:connectsafely.ai)",
+      "WebFetch(domain:zadarma.com)",
+      "mcp__mcp-registry__search_mcp_registry",
+      "WebFetch(domain:www.npmjs.com)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(pip3 --version)",
+      "Bash(python3.13 -c \"import ast; ast.parse\\(open\\(''zadarma-mcp-server/src/server.py''\\).read\\(\\)\\); print\\(''Syntax OK''\\)\")",
+      "Bash(python3.11 -c \"import ast; ast.parse\\(open\\(''zadarma-mcp-server/src/server.py''\\).read\\(\\)\\); print\\(''Syntax OK''\\)\")",
+      "Bash(node -e \":*)",
+      "Bash(gh repo:*)",
+      "Read(//c/Program Files/**)",
+      "Read(//c/Program Files \\(x86\\)/**)",
+      "WebFetch(domain:api.github.com)",
+      "WebFetch(domain:web-production-7fdec.up.railway.app)",
+      "Bash(gh api:*)",
+      "Bash(python3 -c \"import sys,json; data=json.load\\(sys.stdin\\); [print\\(t[''''path'''']\\) for t in data.get\\(''''tree'''',[]\\) if t[''''path''''].startswith\\(''''PAS/''''\\) and t[''''type'''']==''''blob'''']\")",
+      "Bash(where python:*)",
+      "Bash(where pip:*)",
+      "Bash(where py:*)",
+      "Bash(python -m pip install streamlit pandas numpy plotly openpyxl xlrd)",
+      "Bash(where gh:*)",
+      "Bash(gh auth:*)",
+      "Bash(where git:*)",
+      "Bash(python -c \"import ast; ast.parse\\(open\\(''monte_carlo_trading.py''\\).read\\(\\)\\); print\\(''Syntax OK''\\)\")",
+      "Bash(where python3:*)",
+      "Bash(python3 -c \"import ast; ast.parse\\(open\\(''monte_carlo_trading.py''\\).read\\(\\)\\); print\\(''Syntax OK''\\)\")"
+    ]
+  }
+}

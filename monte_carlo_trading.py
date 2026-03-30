@@ -109,7 +109,7 @@ h1, h2, h3, h4, h5, h6 {
     padding: 16px 20px;
     font-size: 14px;
     line-height: 1.6;
-    color: #9ca3af;
+    color: #c9cdd5;
     margin: 12px 0;
 }
 .kelly-card {
@@ -126,7 +126,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 .kelly-sub {
     font-size: 12px;
-    color: #6b7280;
+    color: #9ca3af;
     margin-bottom: 14px;
 }
 .kelly-val {
@@ -137,7 +137,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 .kelly-unit {
     font-size: 12px;
-    color: #6b7280;
+    color: #9ca3af;
     text-transform: uppercase;
     letter-spacing: 1px;
 }
@@ -154,7 +154,7 @@ div[data-testid="stSelectbox"] label,
 div[data-testid="stNumberInput"] label,
 div[data-testid="stFileUploader"] label,
 div[data-testid="stCheckbox"] label {
-    color: #9ca3af !important;
+    color: #d0d4dc !important;
     font-weight: 500;
 }
 .stButton > button {
@@ -177,7 +177,7 @@ div[data-testid="stCheckbox"] label {
 }
 .stDownloadButton > button {
     background: #1a1d23;
-    color: #9ca3af;
+    color: #c9cdd5;
     border: 1px solid #22252b;
     border-radius: 10px;
     font-family: 'Space Grotesk', sans-serif;
@@ -193,7 +193,7 @@ div[data-testid="stCheckbox"] label {
 div[data-testid="stTabs"] button {
     font-family: 'Space Grotesk', sans-serif;
     font-weight: 500;
-    color: #6b7280;
+    color: #9ca3af;
 }
 div[data-testid="stTabs"] button[aria-selected="true"] {
     color: #e0e4ec;
@@ -634,9 +634,9 @@ if df is not None and pnl_column is not None:
                         marker_line=dict(color="rgba(160, 130, 240, 0.8)", width=0.5),
                     ))
                     fig_hist.add_vline(
-                        x=orig_max_dd, line_color="#1a56db", line_width=2,
+                        x=orig_max_dd, line_color="#60a5fa", line_width=2,
                         annotation_text="Your Drawdown",
-                        annotation_font=dict(color="#1a56db", size=12),
+                        annotation_font=dict(color="#60a5fa", size=12),
                     )
                     fig_hist.add_vline(
                         x=avg_dd, line_color="#ffffff", line_width=2,
@@ -646,12 +646,16 @@ if df is not None and pnl_column is not None:
                     fig_hist.update_layout(
                         plot_bgcolor="#1a1d23",
                         paper_bgcolor="#111317",
-                        font=dict(family="Space Grotesk, sans-serif", color="#9ca3af",
+                        font=dict(family="Space Grotesk, sans-serif", color="#e0e4ec",
                                   size=13),
                         height=340,
                         margin=dict(l=60, r=30, t=30, b=50),
-                        xaxis=dict(title="Max Drawdown", gridcolor="#22252b"),
-                        yaxis=dict(title="Frequency", gridcolor="#22252b"),
+                        xaxis=dict(title="Max Drawdown", gridcolor="#2a2d35",
+                                   title_font=dict(color="#e0e4ec"),
+                                   tickfont=dict(color="#c9cdd5")),
+                        yaxis=dict(title="Frequency", gridcolor="#2a2d35",
+                                   title_font=dict(color="#e0e4ec"),
+                                   tickfont=dict(color="#c9cdd5")),
                         showlegend=False,
                     )
                     st.plotly_chart(fig_hist, use_container_width=True)
@@ -694,7 +698,7 @@ if df is not None and pnl_column is not None:
                             <span class="stat-label">Your DD Percentile</span>
                             <span class="stat-value" style="color: #60a5fa;">{pct_worse:.1f}%</span>
                         </div>
-                        <div style="font-size: 11px; color: #6b7280; margin-top: 4px;">
+                        <div style="font-size: 11px; color: #9ca3af; margin-top: 4px;">
                             {pct_worse:.0f}% of random orderings had a drawdown
                             equal to or deeper than yours.
                         </div>
@@ -823,22 +827,27 @@ if df is not None and pnl_column is not None:
                 fig_kelly.update_layout(
                     plot_bgcolor="#1a1d23",
                     paper_bgcolor="#111317",
-                    font=dict(family="Space Grotesk, sans-serif", color="#9ca3af",
+                    font=dict(family="Space Grotesk, sans-serif", color="#e0e4ec",
                               size=13),
                     height=600,
                     margin=dict(l=60, r=30, t=50, b=60),
                     xaxis=dict(
-                        title="Trade Number", gridcolor="#22252b",
-                        zerolinecolor="#22252b", title_font=dict(size=14),
+                        title="Trade Number", gridcolor="#2a2d35",
+                        zerolinecolor="#2a2d35",
+                        title_font=dict(size=14, color="#e0e4ec"),
+                        tickfont=dict(color="#c9cdd5"),
                     ),
                     yaxis=dict(
-                        title="Equity ($)", gridcolor="#22252b",
-                        zerolinecolor="#3a3f4b", title_font=dict(size=14),
+                        title="Equity ($)", gridcolor="#2a2d35",
+                        zerolinecolor="#3a3f4b",
+                        title_font=dict(size=14, color="#e0e4ec"),
+                        tickfont=dict(color="#c9cdd5"),
                         type="log",
                     ),
                     legend=dict(
                         orientation="h", yanchor="bottom", y=1.02,
-                        xanchor="center", x=0.5, font=dict(size=13),
+                        xanchor="center", x=0.5,
+                        font=dict(size=13, color="#e0e4ec"),
                         bgcolor="rgba(0,0,0,0)",
                     ),
                     hovermode="x unified",

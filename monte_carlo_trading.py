@@ -56,17 +56,19 @@ h1, h2, h3, h4, h5, h6 {
     font-weight: 600;
     color: #e0e4ec;
     letter-spacing: -0.3px;
-    margin-bottom: 20px;
-    padding-bottom: 10px;
+    margin-top: 12px;
+    margin-bottom: 24px;
+    padding-bottom: 12px;
     border-bottom: 2px solid #22252b;
 }
 .metric-card {
     background: #1a1d23;
     border: 1px solid #22252b;
     border-radius: 14px;
-    padding: 22px 20px;
+    padding: 26px 22px;
     text-align: center;
     transition: border-color 0.2s;
+    margin: 6px 4px;
 }
 .metric-card:hover {
     border-color: #3a3f4b;
@@ -76,12 +78,12 @@ h1, h2, h3, h4, h5, h6 {
     color: #9ca3af;
     text-transform: uppercase;
     letter-spacing: 1.8px;
-    margin-bottom: 8px;
+    margin-bottom: 10px;
     font-weight: 500;
 }
 .metric-value {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 26px;
+    font-size: 24px;
     font-weight: 600;
     color: #f0f2f5;
 }
@@ -91,9 +93,10 @@ h1, h2, h3, h4, h5, h6 {
 .stat-row {
     display: flex;
     justify-content: space-between;
-    padding: 8px 0;
+    padding: 10px 4px;
     border-bottom: 1px solid #22252b;
     font-size: 14px;
+    gap: 16px;
 }
 .stat-label { color: #9ca3af; }
 .stat-value {
@@ -106,17 +109,18 @@ h1, h2, h3, h4, h5, h6 {
     border: 1px solid #22252b;
     border-left: 3px solid #3b82f6;
     border-radius: 8px;
-    padding: 16px 20px;
+    padding: 18px 24px;
     font-size: 14px;
-    line-height: 1.6;
+    line-height: 1.7;
     color: #c9cdd5;
-    margin: 12px 0;
+    margin: 16px 0 24px 0;
 }
 .kelly-card {
     background: #1a1d23;
     border: 1px solid #22252b;
     border-radius: 14px;
-    padding: 24px;
+    padding: 26px 22px;
+    margin: 6px 4px;
 }
 .kelly-header {
     font-size: 16px;
@@ -432,25 +436,6 @@ if df is not None and pnl_column is not None:
                 # --- Build Chart ---
                 fig = go.Figure()
 
-                # Color palette for simulation lines (like reference image)
-                sim_colors = [
-                    "rgba(255, 107, 107, {a})",  # red
-                    "rgba(255, 159, 67, {a})",   # orange
-                    "rgba(254, 202, 87, {a})",   # yellow
-                    "rgba(46, 213, 115, {a})",   # green
-                    "rgba(30, 196, 179, {a})",   # teal
-                    "rgba(69, 170, 242, {a})",   # light blue
-                    "rgba(140, 122, 230, {a})",  # purple
-                    "rgba(232, 67, 147, {a})",   # pink
-                    "rgba(162, 210, 81, {a})",   # lime
-                    "rgba(0, 210, 211, {a})",    # cyan
-                    "rgba(204, 142, 53, {a})",   # gold
-                    "rgba(119, 190, 29, {a})",   # bright green
-                    "rgba(196, 113, 237, {a})",  # violet
-                    "rgba(255, 135, 135, {a})",  # salmon
-                    "rgba(72, 219, 251, {a})",   # sky
-                ]
-
                 if bundle_toggle and n_simulations > 10:
                     bundle_size = 10
                     n_bundles = n_simulations // bundle_size
@@ -458,58 +443,59 @@ if df is not None and pnl_column is not None:
                         bundled = np.mean(
                             all_curves[b * bundle_size: (b + 1) * bundle_size], axis=0
                         )
-                        c = sim_colors[b % len(sim_colors)].format(a=0.25)
                         fig.add_trace(go.Scattergl(
                             x=x_axis, y=bundled, mode="lines",
-                            line=dict(color=c, width=1),
+                            line=dict(color="rgba(160, 130, 240, 0.15)", width=1),
                             hoverinfo="skip", showlegend=False,
                         ))
                 else:
                     max_plot = min(n_simulations, 2000)
                     indices = (np.random.choice(n_simulations, max_plot, replace=False)
                                if n_simulations > max_plot else np.arange(n_simulations))
-                    for idx_pos, i in enumerate(indices):
-                        c = sim_colors[idx_pos % len(sim_colors)].format(a=0.15)
+                    for i in indices:
                         fig.add_trace(go.Scattergl(
                             x=x_axis, y=all_curves[i], mode="lines",
-                            line=dict(color=c, width=0.8),
+                            line=dict(color="rgba(160, 130, 240, 0.08)", width=0.8),
                             hoverinfo="skip", showlegend=False,
                         ))
 
-                # Original curve (bold dark blue like reference)
+                # Original curve (light blue)
                 fig.add_trace(go.Scattergl(
                     x=x_axis, y=original_curve, mode="lines",
                     name="Original Sequence",
-                    line=dict(color="#1a56db", width=4),
+                    line=dict(color="#60a5fa", width=2),
                 ))
 
-                # Average curve (white, thickest)
+                # Average curve (white)
                 fig.add_trace(go.Scattergl(
                     x=x_axis, y=avg_curve, mode="lines",
                     name="Average (all simulations)",
-                    line=dict(color="#ffffff", width=4),
+                    line=dict(color="#ffffff", width=2),
                 ))
 
                 fig.update_layout(
-                    plot_bgcolor="#f5f5f5",
+                    plot_bgcolor="#1a1d23",
                     paper_bgcolor="#111317",
-                    font=dict(family="Space Grotesk, sans-serif", color="#ffffff",
+                    font=dict(family="Space Grotesk, sans-serif", color="#e0e4ec",
                               size=13),
                     height=680,
                     margin=dict(l=60, r=30, t=50, b=60),
                     xaxis=dict(
-                        title="Trade Number", gridcolor="#ddd",
-                        zerolinecolor="#bbb", title_font=dict(size=14, color="#ffffff"),
-                        tickfont=dict(color="#ffffff"),
+                        title="Trade Number", gridcolor="#2a2d35",
+                        zerolinecolor="#2a2d35",
+                        title_font=dict(size=14, color="#e0e4ec"),
+                        tickfont=dict(color="#c9cdd5"),
                     ),
                     yaxis=dict(
-                        title="Cumulative P&L", gridcolor="#ddd",
-                        zerolinecolor="#999", title_font=dict(size=14, color="#ffffff"),
-                        tickfont=dict(color="#ffffff"),
+                        title="Cumulative P&L", gridcolor="#2a2d35",
+                        zerolinecolor="#3a3f4b",
+                        title_font=dict(size=14, color="#e0e4ec"),
+                        tickfont=dict(color="#c9cdd5"),
                     ),
                     legend=dict(
                         orientation="h", yanchor="bottom", y=1.02,
-                        xanchor="center", x=0.5, font=dict(size=13, color="#ffffff"),
+                        xanchor="center", x=0.5,
+                        font=dict(size=13, color="#e0e4ec"),
                         bgcolor="rgba(0,0,0,0)",
                     ),
                     hovermode="x unified",
@@ -604,7 +590,7 @@ if df is not None and pnl_column is not None:
                     </div>""", unsafe_allow_html=True)
 
                 # --- Distribution Section ---
-                st.markdown("<br>", unsafe_allow_html=True)
+                st.markdown("<br><br>", unsafe_allow_html=True)
                 st.markdown(
                     '<div class="section-title">Drawdown Distribution</div>',
                     unsafe_allow_html=True,

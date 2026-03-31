@@ -408,7 +408,7 @@ if df is not None and pnl_column is not None:
 
     st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
 
-    tab_mc, tab_kelly = st.tabs(["Monte Carlo Simulator", "Kelly Criterion Analysis"])
+    tab_mc, tab_kelly, tab_var = st.tabs(["Monte Carlo Simulator", "Kelly Criterion Analysis", "Risk Analytics (VaR)"])
 
     # =====================================================================
     # TAB 1: MONTE CARLO
@@ -998,6 +998,338 @@ if df is not None and pnl_column is not None:
                 )
 
 
+    # =====================================================================
+    # TAB 3: RISK ANALYTICS (VaR)
+    # =====================================================================
+    with tab_var:
+        st.markdown(
+            '<div class="section-title">Value at Risk (VaR) Analysis</div>',
+            unsafe_allow_html=True,
+        )
+
+        st.markdown(
+            '<div class="info-box">'
+            '<strong>Value at Risk (VaR)</strong> answers a simple question: '
+            '"What is the worst loss I can expect in a given percentage of cases?" '
+            'For example, a 95% VaR of -$500 means that 95% of the time, your loss on a single '
+            'trade will not exceed $500 — but 5% of the time, it could be worse.'
+            '<br><br>'
+            '<strong>Two methods:</strong><br>'
+            '• <strong>Historical VaR</strong> — sorts your actual trade P&L data and picks '
+            'the loss at the relevant percentile. Simple, no assumptions about distribution.<br>'
+            '• <strong>Monte Carlo VaR</strong> — uses the simulated equity paths (if you ran '
+            'the Monte Carlo tab) to estimate VaR from per-trade changes across thousands of '
+            'randomized sequences. Captures a broader range of possible outcomes.'
+            '</div>',
+            unsafe_allow_html=True,
+        )
+
+        # ---- Historical VaR ----
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown(
+            '<div class="section-title" style="font-size: 18px;">Historical VaR</div>',
+            unsafe_allow_html=True,
+        )
+
+        sorted_pnl = np.sort(pnl_values)
+        n_total = len(sorted_pnl)
+
+        confidence_levels = [0.90, 0.95, 0.99]
+        var_results = {}
+        for cl in confidence_levels:
+            idx = int(np.floor((1 - cl) * n_total))
+            idx = max(0, min(idx, n_total - 1))
+            var_results[cl] = sorted_pnl[idx]
+
+        # VaR cards
+        vc1, vc2, vc3 = st.columns(3)
+
+        var_descriptions = {
+            0.90: "In 9 out of 10 trades, your loss will not exceed this amount. "
+                  "This is a moderate confidence threshold.",
+            0.95: "The industry standard. In 19 out of 20 trades, your loss stays "
+                  "within this limit. Used by most risk managers.",
+            0.99: "The most conservative measure. Only 1 in 100 trades is expected "
+                  "to breach this threshold — your extreme tail risk.",
+        }
+
+        for col_var, cl in zip([vc1, vc2, vc3], confidence_levels):
+            var_val = var_results[cl]
+            val_class = "negative" if var_val < 0 else "positive"
+            with col_var:
+                st.markdown(f"""
+                <div class="kelly-card">
+                    <div class="kelly-header" style="color: #60a5fa;">{cl*100:.0f}% Confidence</div>
+                    <div class="kelly-sub">Historical Simulation</div>
+                    <div class="kelly-val" style="color: {'#f87171' if var_val < 0 else '#4ade80'};">
+                        {fmt_human(var_val)}
+                    </div>
+                    <div class="kelly-unit">Max Expected Loss Per Trade</div>
+                    <div style="margin-top: 14px; font-size: 13px; color: #9ca3af; line-height: 1.6;">
+                        {var_descriptions[cl]}
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+
+        # ---- Additional Historical Stats ----
+        st.markdown("<br>", unsafe_allow_html=True)
+
+        col_dist, col_detail = st.columns([3, 1], gap="large")
+
+        with col_dist:
+            # P&L distribution histogram
+            fig_var = go.Figure()
+            fig_var.add_trace(go.Histogram(
+                x=pnl_values,
+                nbinsx=60,
+                marker_color="rgba(96, 165, 250, 0.4)",
+                marker_line=dict(color="rgba(96, 165, 250, 0.7)", width=0.5),
+                name="Trade P&L",
+            ))
+
+            # Add VaR lines
+            var_line_colors = {0.90: "#fbbf24", 0.95: "#f87171", 0.99: "#ef4444"}
+            for cl in confidence_levels:
+                fig_var.add_vline(
+                    x=var_results[cl],
+                    line_color=var_line_colors[cl], line_width=2,
+                    line_dash="dash",
+                    annotation_text=f"VaR {cl*100:.0f}%",
+                    annotation_font=dict(color=var_line_colors[cl], size=11),
+                )
+
+            # Mean line
+            fig_var.add_vline(
+                x=np.mean(pnl_values),
+                line_color="#4ade80", line_width=2,
+                annotation_text="Mean",
+                annotation_font=dict(color="#4ade80", size=11),
+            )
+
+            fig_var.update_layout(
+                plot_bgcolor="#1a1d23",
+                paper_bgcolor="#111317",
+                font=dict(family="Space Grotesk, sans-serif", color="#e0e4ec", size=13),
+                height=380,
+                margin=dict(l=60, r=30, t=30, b=50),
+                xaxis=dict(title="Trade P&L", gridcolor="#2a2d35",
+                           title_font=dict(color="#e0e4ec"),
+                           tickfont=dict(color="#c9cdd5")),
+                yaxis=dict(title="Frequency", gridcolor="#2a2d35",
+                           title_font=dict(color="#e0e4ec"),
+                           tickfont=dict(color="#c9cdd5")),
+                showlegend=False,
+            )
+            st.plotly_chart(fig_var, use_container_width=True)
+
+        with col_detail:
+            mean_pnl = np.mean(pnl_values)
+            median_pnl = np.median(pnl_values)
+            std_pnl = np.std(pnl_values)
+            skew_pnl = float(pd.Series(pnl_values).skew())
+            worst_trade = np.min(pnl_values)
+            best_trade = np.max(pnl_values)
+            cvar_95 = np.mean(sorted_pnl[sorted_pnl <= var_results[0.95]])
+
+            st.markdown(f"""
+            <div style="padding: 10px 0;">
+                <div class="stat-row">
+                    <span class="stat-label">Mean P&L</span>
+                    <span class="stat-value" style="color: {'#4ade80' if mean_pnl >= 0 else '#f87171'};">
+                        {fmt_human(mean_pnl)}</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Median P&L</span>
+                    <span class="stat-value">{fmt_human(median_pnl)}</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Std Deviation</span>
+                    <span class="stat-value">{fmt_human(std_pnl)}</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Skewness</span>
+                    <span class="stat-value">{skew_pnl:+.2f}</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Worst Trade</span>
+                    <span class="stat-value" style="color: #f87171;">{fmt_human(worst_trade)}</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Best Trade</span>
+                    <span class="stat-value" style="color: #4ade80;">{fmt_human(best_trade)}</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">CVaR 95%</span>
+                    <span class="stat-value" style="color: #f87171;">{fmt_human(cvar_95)}</span>
+                </div>
+                <div style="font-size: 11px; color: #6b7280; margin-top: 8px;">
+                    CVaR (Expected Shortfall) = average loss<br>
+                    when VaR is breached. Captures tail severity.
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+        # ---- Monte Carlo VaR ----
+        st.markdown("<br><br>", unsafe_allow_html=True)
+        st.markdown(
+            '<div class="section-title" style="font-size: 18px;">Monte Carlo VaR</div>',
+            unsafe_allow_html=True,
+        )
+
+        col_mc_var_nsim, col_mc_var_run, _ = st.columns([2, 2, 4], gap="medium")
+
+        with col_mc_var_nsim:
+            var_n_sims = st.number_input(
+                "Number of Simulations",
+                min_value=100,
+                max_value=50000,
+                value=2000,
+                step=500,
+                key="var_nsims",
+            )
+
+        with col_mc_var_run:
+            st.markdown("<br>", unsafe_allow_html=True)
+            var_run_clicked = st.button("Run Monte Carlo VaR", use_container_width=True,
+                                         key="var_mc_run")
+
+        if var_run_clicked:
+            with st.spinner("Running Monte Carlo VaR simulations..."):
+                _, mc_var_curves, _ = run_monte_carlo(
+                    pnl_values, int(var_n_sims), method="resample"
+                )
+
+                # Extract per-trade P&L from all simulated curves
+                mc_per_trade = np.diff(mc_var_curves, axis=1, prepend=0)
+                mc_all_trades = mc_per_trade.flatten()
+
+                mc_sorted = np.sort(mc_all_trades)
+
+                mc_var_results = {}
+                mc_cvar_results = {}
+                for cl in confidence_levels:
+                    idx = int(np.floor((1 - cl) * len(mc_sorted)))
+                    idx = max(0, min(idx, len(mc_sorted) - 1))
+                    mc_var_results[cl] = mc_sorted[idx]
+                    mc_cvar_results[cl] = np.mean(mc_sorted[:idx + 1]) if idx > 0 else mc_sorted[0]
+
+            # Comparison table
+            st.markdown("<br>", unsafe_allow_html=True)
+
+            mc_vc1, mc_vc2, mc_vc3 = st.columns(3)
+
+            for col_mc, cl in zip([mc_vc1, mc_vc2, mc_vc3], confidence_levels):
+                h_var = var_results[cl]
+                m_var = mc_var_results[cl]
+                diff = m_var - h_var
+                with col_mc:
+                    st.markdown(f"""
+                    <div class="kelly-card">
+                        <div class="kelly-header" style="color: #a78bfa;">{cl*100:.0f}% Confidence</div>
+                        <div class="kelly-sub">Monte Carlo vs Historical</div>
+                        <div style="display: flex; gap: 24px; margin: 14px 0;">
+                            <div>
+                                <div style="font-size: 11px; color: #9ca3af; text-transform: uppercase;
+                                    letter-spacing: 1px; margin-bottom: 4px;">Historical</div>
+                                <div style="font-family: JetBrains Mono, monospace; font-size: 20px;
+                                    font-weight: 600; color: #f87171;">{fmt_human(h_var)}</div>
+                            </div>
+                            <div>
+                                <div style="font-size: 11px; color: #9ca3af; text-transform: uppercase;
+                                    letter-spacing: 1px; margin-bottom: 4px;">Monte Carlo</div>
+                                <div style="font-family: JetBrains Mono, monospace; font-size: 20px;
+                                    font-weight: 600; color: #a78bfa;">{fmt_human(m_var)}</div>
+                            </div>
+                        </div>
+                        <div style="font-size: 12px; color: #9ca3af; border-top: 1px solid #22252b;
+                            padding-top: 10px;">
+                            Difference: <span style="font-family: JetBrains Mono, monospace;
+                            color: {'#4ade80' if diff >= 0 else '#f87171'};">{fmt_human(diff)}</span>
+                            <br>MC CVaR: <span style="font-family: JetBrains Mono, monospace;
+                            color: #f87171;">{fmt_human(mc_cvar_results[cl])}</span>
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+
+            # MC VaR distribution chart
+            st.markdown("<br>", unsafe_allow_html=True)
+
+            fig_mc_var = go.Figure()
+
+            # Historical distribution
+            fig_mc_var.add_trace(go.Histogram(
+                x=pnl_values,
+                nbinsx=60,
+                marker_color="rgba(96, 165, 250, 0.3)",
+                marker_line=dict(color="rgba(96, 165, 250, 0.5)", width=0.5),
+                name="Historical Trades",
+                opacity=0.7,
+            ))
+
+            # MC distribution (subsample for performance)
+            mc_sample = mc_all_trades[np.random.choice(len(mc_all_trades),
+                        size=min(50000, len(mc_all_trades)), replace=False)]
+            fig_mc_var.add_trace(go.Histogram(
+                x=mc_sample,
+                nbinsx=80,
+                marker_color="rgba(167, 139, 250, 0.3)",
+                marker_line=dict(color="rgba(167, 139, 250, 0.5)", width=0.5),
+                name="Monte Carlo Trades",
+                opacity=0.7,
+            ))
+
+            # VaR lines
+            fig_mc_var.add_vline(
+                x=var_results[0.95], line_color="#60a5fa", line_width=2,
+                line_dash="dash",
+                annotation_text="Historical 95%",
+                annotation_font=dict(color="#60a5fa", size=11),
+            )
+            fig_mc_var.add_vline(
+                x=mc_var_results[0.95], line_color="#a78bfa", line_width=2,
+                line_dash="dash",
+                annotation_text="MC 95%",
+                annotation_font=dict(color="#a78bfa", size=11),
+            )
+
+            fig_mc_var.update_layout(
+                plot_bgcolor="#1a1d23",
+                paper_bgcolor="#111317",
+                font=dict(family="Space Grotesk, sans-serif", color="#e0e4ec", size=13),
+                height=400,
+                margin=dict(l=60, r=30, t=30, b=50),
+                barmode="overlay",
+                xaxis=dict(title="Trade P&L", gridcolor="#2a2d35",
+                           title_font=dict(color="#e0e4ec"),
+                           tickfont=dict(color="#c9cdd5")),
+                yaxis=dict(title="Frequency", gridcolor="#2a2d35",
+                           title_font=dict(color="#e0e4ec"),
+                           tickfont=dict(color="#c9cdd5")),
+                legend=dict(
+                    orientation="h", yanchor="bottom", y=1.02,
+                    xanchor="center", x=0.5,
+                    font=dict(size=13, color="#e0e4ec"),
+                    bgcolor="rgba(0,0,0,0)",
+                ),
+            )
+
+            st.plotly_chart(fig_mc_var, use_container_width=True)
+
+            st.markdown(
+                '<div class="info-box">'
+                '<strong>How to read this:</strong> If the Monte Carlo VaR is wider (more negative) '
+                'than the Historical VaR, your actual trade history may be understating risk — the '
+                'resampled scenarios reveal worse outcomes that haven\'t happened yet but statistically '
+                'could. If they\'re close, your historical data already captures the full risk picture.'
+                '<br><br>'
+                '<strong>CVaR (Conditional VaR)</strong> — also called Expected Shortfall — is the '
+                'average loss in the worst cases beyond VaR. It tells you not just <em>where</em> '
+                'the tail starts, but <em>how bad</em> it gets on average when things go wrong.'
+                '</div>',
+                unsafe_allow_html=True,
+            )
+
+
 # =========================================================================
 # FOOTER
 # =========================================================================
@@ -1006,7 +1338,7 @@ st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
 st.markdown(
     '<p style="text-align:center; color:#3a3f4b; font-size:12px; '
     'font-family: Space Grotesk, sans-serif; letter-spacing: 0.5px;">'
-    'Quantitative Trading Lab &middot; Monte Carlo Permutation &middot; '
-    'Kelly Criterion Analysis</p>',
+    'Quantitative Trading Lab &middot; Monte Carlo &middot; '
+    'Kelly Criterion &middot; Value at Risk</p>',
     unsafe_allow_html=True,
 )

@@ -464,6 +464,10 @@ if df is not None and pnl_column is not None:
                     original_curve, all_curves, avg_curve = run_monte_carlo(
                         pnl_values, int(n_simulations), method=method_key
                     )
+                    # Store in session state for VaR tab
+                    st.session_state["mc_all_curves"] = all_curves
+                    st.session_state["mc_n_sims"] = int(n_simulations)
+                    st.session_state["mc_method"] = method_key
 
                 n_trades = len(pnl_values)
                 x_axis = np.arange(1, n_trades + 1)
@@ -1176,42 +1180,35 @@ if df is not None and pnl_column is not None:
             unsafe_allow_html=True,
         )
 
-        col_mc_var_nsim, col_mc_var_run, _ = st.columns([2, 2, 4], gap="medium")
+        has_mc_data = "mc_all_curves" in st.session_state
 
-        with col_mc_var_nsim:
-            var_n_sims = st.number_input(
-                "Number of Simulations",
-                min_value=100,
-                max_value=50000,
-                value=2000,
-                step=500,
-                key="var_nsims",
+        if has_mc_data:
+            mc_n = st.session_state["mc_n_sims"]
+            mc_m = st.session_state["mc_method"]
+            method_label = "Resample" if mc_m == "resample" else "Permutation"
+            st.markdown(
+                f'<div class="info-box" style="border-left-color: #4ade80;">'
+                f'✓ Using simulation data from Monte Carlo tab — '
+                f'<strong>{mc_n:,} simulations</strong> ({method_label}). '
+                f'No need to re-run.</div>',
+                unsafe_allow_html=True,
             )
 
-        with col_mc_var_run:
-            st.markdown("<br>", unsafe_allow_html=True)
-            var_run_clicked = st.button("Run Monte Carlo VaR", use_container_width=True,
-                                         key="var_mc_run")
+            mc_var_curves = st.session_state["mc_all_curves"]
 
-        if var_run_clicked:
-            with st.spinner("Running Monte Carlo VaR simulations..."):
-                _, mc_var_curves, _ = run_monte_carlo(
-                    pnl_values, int(var_n_sims), method="resample"
-                )
+            # Extract per-trade P&L from all simulated curves
+            mc_per_trade = np.diff(mc_var_curves, axis=1, prepend=0)
+            mc_all_trades = mc_per_trade.flatten()
 
-                # Extract per-trade P&L from all simulated curves
-                mc_per_trade = np.diff(mc_var_curves, axis=1, prepend=0)
-                mc_all_trades = mc_per_trade.flatten()
+            mc_sorted = np.sort(mc_all_trades)
 
-                mc_sorted = np.sort(mc_all_trades)
-
-                mc_var_results = {}
-                mc_cvar_results = {}
-                for cl in confidence_levels:
-                    idx = int(np.floor((1 - cl) * len(mc_sorted)))
-                    idx = max(0, min(idx, len(mc_sorted) - 1))
-                    mc_var_results[cl] = mc_sorted[idx]
-                    mc_cvar_results[cl] = np.mean(mc_sorted[:idx + 1]) if idx > 0 else mc_sorted[0]
+            mc_var_results = {}
+            mc_cvar_results = {}
+            for cl in confidence_levels:
+                idx = int(np.floor((1 - cl) * len(mc_sorted)))
+                idx = max(0, min(idx, len(mc_sorted) - 1))
+                mc_var_results[cl] = mc_sorted[idx]
+                mc_cvar_results[cl] = np.mean(mc_sorted[:idx + 1]) if idx > 0 else mc_sorted[0]
 
             # Comparison table
             st.markdown("<br>", unsafe_allow_html=True)
@@ -1326,6 +1323,15 @@ if df is not None and pnl_column is not None:
                 'average loss in the worst cases beyond VaR. It tells you not just <em>where</em> '
                 'the tail starts, but <em>how bad</em> it gets on average when things go wrong.'
                 '</div>',
+                unsafe_allow_html=True,
+            )
+        else:
+            st.markdown(
+                '<div class="info-box" style="border-left-color: #fbbf24;">'
+                '⚠ No Monte Carlo data available yet. Go to the '
+                '<strong>Monte Carlo Simulator</strong> tab first, run a simulation, '
+                'then come back here — the results will be automatically loaded for '
+                'VaR comparison.</div>',
                 unsafe_allow_html=True,
             )
 

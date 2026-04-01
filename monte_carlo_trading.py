@@ -11,7 +11,7 @@ from plotly.subplots import make_subplots
 import io
 
 st.set_page_config(
-    page_title="Quantitative Trading Lab",
+    page_title="Anarchy Terminal",
     layout="wide",
     initial_sidebar_state="collapsed",
 )
@@ -209,7 +209,7 @@ div[data-testid="stTabs"] button[aria-selected="true"] {
 # --- Header ---
 st.markdown("""
 <div class="header-container">
-    <h1>Quantitative Trading Lab</h1>
+    <h1>Anarchy Terminal</h1>
 </div>
 """, unsafe_allow_html=True)
 
@@ -1867,7 +1867,7 @@ st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
 st.markdown(
     '<p style="text-align:center; color:#3a3f4b; font-size:12px; '
     'font-family: Space Grotesk, sans-serif; letter-spacing: 0.5px;">'
-    'Quantitative Trading Lab &middot; Monte Carlo &middot; '
+    'Anarchy Terminal &middot; Monte Carlo &middot; '
     'Kelly Criterion &middot; Value at Risk &middot; Risk Laboratory</p>',
     unsafe_allow_html=True,
 )

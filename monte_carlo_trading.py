@@ -408,7 +408,7 @@ if df is not None and pnl_column is not None:
 
     st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
 
-    tab_mc, tab_kelly, tab_var = st.tabs(["Monte Carlo Simulator", "Kelly Criterion Analysis", "Risk Analytics (VaR)"])
+    tab_mc, tab_kelly, tab_var, tab_risk = st.tabs(["Monte Carlo Simulator", "Kelly Criterion Analysis", "Risk Analytics (VaR)", "Risk Laboratory"])
 
     # =====================================================================
     # TAB 1: MONTE CARLO
@@ -464,10 +464,23 @@ if df is not None and pnl_column is not None:
                     original_curve, all_curves, avg_curve = run_monte_carlo(
                         pnl_values, int(n_simulations), method=method_key
                     )
-                    # Store in session state for VaR tab
+                    # Store everything in session state so results persist across reruns
                     st.session_state["mc_all_curves"] = all_curves
+                    st.session_state["mc_original_curve"] = original_curve
+                    st.session_state["mc_avg_curve"] = avg_curve
                     st.session_state["mc_n_sims"] = int(n_simulations)
                     st.session_state["mc_method"] = method_key
+                    st.session_state["mc_bundle"] = bundle_toggle
+                    st.session_state["mc_has_results"] = True
+
+        # --- Display Results (from session state) ---
+        if st.session_state.get("mc_has_results", False):
+                all_curves = st.session_state["mc_all_curves"]
+                original_curve = st.session_state["mc_original_curve"]
+                avg_curve = st.session_state["mc_avg_curve"]
+                n_sims_display = st.session_state["mc_n_sims"]
+                method_key_display = st.session_state["mc_method"]
+                bundle_display = st.session_state.get("mc_bundle", False)
 
                 n_trades = len(pnl_values)
                 x_axis = np.arange(1, n_trades + 1)
@@ -494,9 +507,9 @@ if df is not None and pnl_column is not None:
                     "rgba(72, 219, 251, {a})",   # sky
                 ]
 
-                if bundle_toggle and n_simulations > 10:
+                if bundle_display and n_sims_display > 10:
                     bundle_size = 10
-                    n_bundles = n_simulations // bundle_size
+                    n_bundles = n_sims_display // bundle_size
                     for b in range(n_bundles):
                         bundled = np.mean(
                             all_curves[b * bundle_size: (b + 1) * bundle_size], axis=0
@@ -508,9 +521,9 @@ if df is not None and pnl_column is not None:
                             hoverinfo="skip", showlegend=False,
                         ))
                 else:
-                    max_plot = min(n_simulations, 2000)
-                    indices = (np.random.choice(n_simulations, max_plot, replace=False)
-                               if n_simulations > max_plot else np.arange(n_simulations))
+                    max_plot = min(n_sims_display, 2000)
+                    indices = (np.random.choice(n_sims_display, max_plot, replace=False)
+                               if n_sims_display > max_plot else np.arange(n_sims_display))
                     for idx_pos, i in enumerate(indices):
                         c = sim_colors[idx_pos % len(sim_colors)].format(a=0.25)
                         fig.add_trace(go.Scattergl(
@@ -631,7 +644,7 @@ if df is not None and pnl_column is not None:
                     st.markdown(f"""
                     <div class="metric-card">
                         <div class="metric-label">Simulations</div>
-                        <div class="metric-value neutral">{n_simulations:,}</div>
+                        <div class="metric-value neutral">{n_sims_display:,}</div>
                     </div>""", unsafe_allow_html=True)
                 with c2:
                     st.markdown(f"""
@@ -694,7 +707,7 @@ if df is not None and pnl_column is not None:
                     unsafe_allow_html=True,
                 )
 
-                if method_key == "permutation":
+                if method_key_display == "permutation":
                     dist_text = (
                         '<strong>Why drawdowns?</strong> Permutation shuffling preserves '
                         'all trades (just reorders them), so every simulation ends at the same '
@@ -901,19 +914,29 @@ if df is not None and pnl_column is not None:
                                       key="kelly_run")
 
             if kelly_run:
-                # Calculate equity curves
-                fig_kelly = go.Figure()
-
+                # Calculate equity curves and store in session state
                 results = {}
                 for name, fraction in kelly_variants.items():
-                    eq = apply_kelly_sizing(pnl_values, kelly, fraction)
-                    results[name] = eq
+                    results[name] = apply_kelly_sizing(pnl_values, kelly, fraction)
+                st.session_state["kelly_results"] = results
+                st.session_state["kelly_variants"] = kelly_variants
+                st.session_state["kelly_colors"] = colors
+                st.session_state["kelly_has_results"] = True
+
+            if st.session_state.get("kelly_has_results", False):
+                results = st.session_state["kelly_results"]
+                kelly_variants_display = st.session_state["kelly_variants"]
+                colors_display = st.session_state["kelly_colors"]
+
+                fig_kelly = go.Figure()
+                for name, fraction in kelly_variants_display.items():
+                    eq = results[name]
                     fig_kelly.add_trace(go.Scattergl(
                         x=np.arange(1, len(eq) + 1),
                         y=eq,
                         mode="lines",
                         name=f"{name} ({fraction * 100:.1f}%)",
-                        line=dict(color=colors[name], width=2.5),
+                        line=dict(color=colors_display[name], width=2.5),
                     ))
 
                 fig_kelly.update_layout(
@@ -950,8 +973,8 @@ if df is not None and pnl_column is not None:
                 # Results cards
                 st.markdown("<br>", unsafe_allow_html=True)
 
-                cols = st.columns(len(kelly_variants))
-                for idx, (name, fraction) in enumerate(kelly_variants.items()):
+                cols = st.columns(len(kelly_variants_display))
+                for idx, (name, fraction) in enumerate(kelly_variants_display.items()):
                     eq = results[name]
                     final_eq = eq[-1] if len(eq) > 0 else 0
                     dd = calc_max_drawdown(eq)
@@ -970,7 +993,7 @@ if df is not None and pnl_column is not None:
                     with cols[idx]:
                         st.markdown(f"""
                         <div class="kelly-card">
-                            <div class="kelly-header" style="color: {colors[name]};">{name}</div>
+                            <div class="kelly-header" style="color: {colors_display[name]};">{name}</div>
                             <div class="kelly-sub">Risk {fraction * 100:.1f}% per trade</div>
                             <div class="kelly-val" style="color: {growth_color};">{growth_str}</div>
                             <div class="kelly-unit">Total Return</div>
@@ -1336,6 +1359,506 @@ if df is not None and pnl_column is not None:
             )
 
 
+    # =====================================================================
+    # TAB 4: RISK LABORATORY
+    # =====================================================================
+    with tab_risk:
+        st.markdown(
+            '<div class="section-title">Risk Laboratory — Stress Testing Suite</div>',
+            unsafe_allow_html=True,
+        )
+
+        st.markdown(
+            '<div class="info-box">'
+            'The <strong>Risk Laboratory</strong> subjects your trading data to a battery '
+            'of stress tests designed to answer one question: <em>"How fragile is my edge?"</em> '
+            'Each module attacks a different assumption — fat-tail shocks, worst-case sequencing, '
+            'execution friction, and edge decay — so you can see how your strategy holds up '
+            'before real capital is on the line.'
+            '</div>',
+            unsafe_allow_html=True,
+        )
+
+        # --- Helper: compute backtest metrics from a P&L array ---
+        def calc_backtest_metrics(pnl):
+            """Return (profit_factor, expectancy, net_profit) for a P&L array."""
+            wins = pnl[pnl > 0]
+            losses = pnl[pnl < 0]
+            gross_profit = np.sum(wins) if len(wins) else 0.0
+            gross_loss = np.abs(np.sum(losses)) if len(losses) else 0.0
+            pf = gross_profit / gross_loss if gross_loss > 0 else float("inf")
+            expectancy = np.mean(pnl) if len(pnl) else 0.0
+            net = np.sum(pnl)
+            return pf, expectancy, net
+
+        # --- Helper: risk grade color ---
+        def risk_grade(dd_pct):
+            """Return (label, color) for a drawdown percentage."""
+            dd = abs(dd_pct)
+            if dd <= 5:
+                return "Moderate", "#4ade80"
+            elif dd <= 10:
+                return "High", "#fbbf24"
+            elif dd <= 20:
+                return "Critical", "#f97316"
+            else:
+                return "Undeployable", "#ef4444"
+
+        mean_pnl_rl = np.mean(pnl_values)
+        std_pnl_rl = np.std(pnl_values, ddof=1) if len(pnl_values) > 1 else 0.0
+        account_size = np.sum(pnl_values)  # cumulative P&L as proxy for account
+
+        # =================================================================
+        # MODULE 1 — SIGMA SHOCK ANALYZER
+        # =================================================================
+        st.markdown(
+            '<div class="section-title" style="font-size: 18px;">1 &mdash; Sigma Shock Analyzer</div>',
+            unsafe_allow_html=True,
+        )
+
+        st.markdown(
+            '<div class="info-box">'
+            'Simulates the impact of statistically extreme losses (1&sigma;, 2&sigma;, 3&sigma;) '
+            'hitting your account as the next 1 or 3 consecutive trades. The resulting drawdown '
+            'is graded by severity.'
+            '</div>',
+            unsafe_allow_html=True,
+        )
+
+        col_acc, col_trades = st.columns(2, gap="medium")
+        with col_acc:
+            sigma_account = st.number_input(
+                "Account Size ($)",
+                min_value=100.0,
+                value=10000.0,
+                step=1000.0,
+                key="sigma_account",
+                help="Your total trading account value used to compute drawdown percentages.",
+            )
+        with col_trades:
+            sigma_n_trades = st.radio(
+                "Consecutive shock trades",
+                [1, 3],
+                horizontal=True,
+                key="sigma_n_trades",
+            )
+
+        sigma_levels = [1, 2, 3]
+        sc1, sc2, sc3 = st.columns(3)
+
+        for col_s, sigma in zip([sc1, sc2, sc3], sigma_levels):
+            shock_loss = mean_pnl_rl - sigma * std_pnl_rl  # negative tail
+            total_loss = shock_loss * sigma_n_trades
+            dd_pct = (total_loss / sigma_account) * 100 if sigma_account else 0
+            grade_label, grade_color = risk_grade(dd_pct)
+
+            with col_s:
+                st.markdown(f"""
+                <div class="kelly-card">
+                    <div class="kelly-header" style="color: {grade_color};">{sigma}&sigma; Shock</div>
+                    <div class="kelly-sub">{sigma_n_trades} trade(s) at &mu; &minus; {sigma}&sigma;</div>
+                    <div class="kelly-val" style="color: {grade_color};">
+                        {dd_pct:+.1f}%
+                    </div>
+                    <div class="kelly-unit">Account Drawdown</div>
+                    <div style="margin-top: 14px;">
+                        <div class="stat-row">
+                            <span class="stat-label">Per-Trade Loss</span>
+                            <span class="stat-value" style="color: #f87171;">{fmt_human(shock_loss)}</span>
+                        </div>
+                        <div class="stat-row">
+                            <span class="stat-label">Total Impact</span>
+                            <span class="stat-value" style="color: #f87171;">{fmt_human(total_loss)}</span>
+                        </div>
+                        <div class="stat-row" style="border-bottom: none;">
+                            <span class="stat-label">Risk Grade</span>
+                            <span class="stat-value" style="color: {grade_color};">{grade_label}</span>
+                        </div>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+
+        # Historical frequency of sigma events
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown(
+            '<div class="section-title" style="font-size: 16px;">Historical Sigma Frequency</div>',
+            unsafe_allow_html=True,
+        )
+
+        freq_cols = st.columns(3)
+        for col_f, sigma in zip(freq_cols, sigma_levels):
+            threshold = mean_pnl_rl - sigma * std_pnl_rl
+            count = int(np.sum(pnl_values <= threshold))
+            pct = count / len(pnl_values) * 100
+            # Expected from normal distribution
+            expected_pct = {1: 15.87, 2: 2.28, 3: 0.13}[sigma]
+            with col_f:
+                st.markdown(f"""
+                <div class="metric-card">
+                    <div class="metric-label">{sigma}&sigma; Events (P&L &le; {fmt_human(threshold)})</div>
+                    <div class="metric-value neutral">{count} <span style="font-size:14px; color:#9ca3af;">
+                        ({pct:.1f}%)</span></div>
+                    <div style="font-size: 11px; color: #6b7280; margin-top: 8px;">
+                        Normal distribution expects ~{expected_pct:.2f}%
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+
+        # =================================================================
+        # MODULE 2 — FATAL SEQUENCE (WORST-CASE)
+        # =================================================================
+        st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
+        st.markdown(
+            '<div class="section-title" style="font-size: 18px;">2 &mdash; Fatal Sequence (Worst-Case Scenario)</div>',
+            unsafe_allow_html=True,
+        )
+
+        st.markdown(
+            '<div class="info-box">'
+            'Extracts the <strong>10 largest losses</strong> from your dataset and simulates '
+            'them occurring back-to-back — the absolute worst-case scenario for your account.'
+            '</div>',
+            unsafe_allow_html=True,
+        )
+
+        sorted_losses = np.sort(pnl_values)[:10]  # 10 most negative
+        fatal_cum = np.cumsum(sorted_losses)
+        fatal_max_dd = np.min(fatal_cum)
+        fatal_final = sigma_account + np.sum(sorted_losses)
+        fatal_dd_pct = (np.sum(sorted_losses) / sigma_account) * 100 if sigma_account else 0
+        fatal_grade, fatal_color = risk_grade(fatal_dd_pct)
+
+        fc1, fc2, fc3, fc4 = st.columns(4)
+        with fc1:
+            st.markdown(f"""
+            <div class="metric-card">
+                <div class="metric-label">Sequence Total Loss</div>
+                <div class="metric-value negative">{fmt_human(np.sum(sorted_losses))}</div>
+            </div>""", unsafe_allow_html=True)
+        with fc2:
+            st.markdown(f"""
+            <div class="metric-card">
+                <div class="metric-label">Max Drawdown</div>
+                <div class="metric-value negative">{fmt_human(fatal_max_dd)}</div>
+            </div>""", unsafe_allow_html=True)
+        with fc3:
+            st.markdown(f"""
+            <div class="metric-card">
+                <div class="metric-label">Final Account Balance</div>
+                <div class="metric-value {'positive' if fatal_final >= 0 else 'negative'}">{fmt_human(fatal_final)}</div>
+            </div>""", unsafe_allow_html=True)
+        with fc4:
+            st.markdown(f"""
+            <div class="metric-card">
+                <div class="metric-label">Drawdown %</div>
+                <div class="metric-value" style="color: {fatal_color};">{fatal_dd_pct:+.1f}%</div>
+                <div style="font-size: 11px; color: {fatal_color}; margin-top: 4px;">{fatal_grade}</div>
+            </div>""", unsafe_allow_html=True)
+
+        # Fatal sequence equity chart
+        st.markdown("<br>", unsafe_allow_html=True)
+        fatal_equity = np.concatenate([[sigma_account], sigma_account + fatal_cum])
+        fig_fatal = go.Figure()
+        fig_fatal.add_trace(go.Scatter(
+            x=np.arange(0, len(fatal_equity)),
+            y=fatal_equity,
+            mode="lines+markers",
+            line=dict(color="#f87171", width=3),
+            marker=dict(size=8, color="#f87171"),
+            name="Fatal Sequence",
+            fill="tozeroy",
+            fillcolor="rgba(248, 113, 113, 0.08)",
+        ))
+        fig_fatal.update_layout(
+            plot_bgcolor="#1a1d23",
+            paper_bgcolor="#111317",
+            font=dict(family="Space Grotesk, sans-serif", color="#e0e4ec", size=13),
+            height=320,
+            margin=dict(l=60, r=30, t=30, b=50),
+            xaxis=dict(title="Trade # in Sequence", gridcolor="#2a2d35",
+                       title_font=dict(color="#e0e4ec"), tickfont=dict(color="#c9cdd5"),
+                       dtick=1),
+            yaxis=dict(title="Account Balance ($)", gridcolor="#2a2d35",
+                       title_font=dict(color="#e0e4ec"), tickfont=dict(color="#c9cdd5")),
+            showlegend=False,
+        )
+        st.plotly_chart(fig_fatal, use_container_width=True)
+
+        # Show the 10 trades
+        st.markdown(
+            '<div style="font-size: 12px; color: #6b7280; margin-top: 4px;">'
+            'The 10 worst trades in order: '
+            + ", ".join(f"<span style='font-family:JetBrains Mono,monospace;color:#f87171;'>"
+                        f"{fmt_human(v)}</span>" for v in sorted_losses)
+            + '</div>',
+            unsafe_allow_html=True,
+        )
+
+        # =================================================================
+        # MODULE 3 — OPERATIONAL STRESS (FRICTION TEST)
+        # =================================================================
+        st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
+        st.markdown(
+            '<div class="section-title" style="font-size: 18px;">3 &mdash; Operational Stress (Friction Test)</div>',
+            unsafe_allow_html=True,
+        )
+
+        st.markdown(
+            '<div class="info-box">'
+            'Applies a flat <strong>4% slippage penalty</strong> to every trade. '
+            'Wins are reduced by 4%, losses are increased by 4%. This models real-world '
+            'execution friction — slippage, spread, partial fills, and latency costs.'
+            '</div>',
+            unsafe_allow_html=True,
+        )
+
+        friction_pnl = np.where(
+            pnl_values >= 0,
+            pnl_values * 0.96,   # reduce wins by 4%
+            pnl_values * 1.04,   # increase losses by 4%
+        )
+
+        orig_pf, orig_exp, orig_net = calc_backtest_metrics(pnl_values)
+        fric_pf, fric_exp, fric_net = calc_backtest_metrics(friction_pnl)
+
+        fric_equity_orig = np.cumsum(pnl_values)
+        fric_equity_stressed = np.cumsum(friction_pnl)
+
+        fig_fric = go.Figure()
+        x_ax = np.arange(1, len(pnl_values) + 1)
+        fig_fric.add_trace(go.Scattergl(
+            x=x_ax, y=fric_equity_orig, mode="lines",
+            name="Original", line=dict(color="#60a5fa", width=2),
+        ))
+        fig_fric.add_trace(go.Scattergl(
+            x=x_ax, y=fric_equity_stressed, mode="lines",
+            name="With 4% Friction", line=dict(color="#fbbf24", width=2),
+        ))
+        fig_fric.update_layout(
+            plot_bgcolor="#1a1d23",
+            paper_bgcolor="#111317",
+            font=dict(family="Space Grotesk, sans-serif", color="#e0e4ec", size=13),
+            height=380,
+            margin=dict(l=60, r=30, t=50, b=50),
+            xaxis=dict(title="Trade Number", gridcolor="#2a2d35",
+                       title_font=dict(color="#e0e4ec"), tickfont=dict(color="#c9cdd5")),
+            yaxis=dict(title="Cumulative P&L", gridcolor="#2a2d35",
+                       zerolinecolor="#3a3f4b",
+                       title_font=dict(color="#e0e4ec"), tickfont=dict(color="#c9cdd5")),
+            legend=dict(orientation="h", yanchor="bottom", y=1.02,
+                        xanchor="center", x=0.5,
+                        font=dict(size=13, color="#e0e4ec"),
+                        bgcolor="rgba(0,0,0,0)"),
+            hovermode="x unified",
+        )
+        st.plotly_chart(fig_fric, use_container_width=True)
+
+        fr1, fr2, fr3 = st.columns(3)
+        net_diff_fric = fric_net - orig_net
+        with fr1:
+            st.markdown(f"""
+            <div class="metric-card">
+                <div class="metric-label">Original Net Profit</div>
+                <div class="metric-value {'positive' if orig_net >= 0 else 'negative'}">{fmt_human(orig_net)}</div>
+            </div>""", unsafe_allow_html=True)
+        with fr2:
+            st.markdown(f"""
+            <div class="metric-card">
+                <div class="metric-label">Friction Net Profit</div>
+                <div class="metric-value {'positive' if fric_net >= 0 else 'negative'}">{fmt_human(fric_net)}</div>
+            </div>""", unsafe_allow_html=True)
+        with fr3:
+            st.markdown(f"""
+            <div class="metric-card">
+                <div class="metric-label">Profit Lost to Friction</div>
+                <div class="metric-value negative">{fmt_human(net_diff_fric)}</div>
+            </div>""", unsafe_allow_html=True)
+
+        # =================================================================
+        # MODULE 4 — REGIME CHANGE (EDGE DECAY)
+        # =================================================================
+        st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
+        st.markdown(
+            '<div class="section-title" style="font-size: 18px;">4 &mdash; Regime Change (Edge Decay)</div>',
+            unsafe_allow_html=True,
+        )
+
+        st.markdown(
+            '<div class="info-box">'
+            'Applies a <strong>16% haircut to all winning trades</strong> while leaving losses '
+            'unchanged. This models what happens when market conditions shift — your edge '
+            'decays, winners shrink, but losers stay the same size.'
+            '</div>',
+            unsafe_allow_html=True,
+        )
+
+        decay_pnl = np.where(
+            pnl_values > 0,
+            pnl_values * 0.84,   # reduce wins by 16%
+            pnl_values,           # losses unchanged
+        )
+
+        decay_pf, decay_exp, decay_net = calc_backtest_metrics(decay_pnl)
+
+        decay_equity_orig = np.cumsum(pnl_values)
+        decay_equity_stressed = np.cumsum(decay_pnl)
+
+        fig_decay = go.Figure()
+        fig_decay.add_trace(go.Scattergl(
+            x=x_ax, y=decay_equity_orig, mode="lines",
+            name="Original", line=dict(color="#60a5fa", width=2),
+        ))
+        fig_decay.add_trace(go.Scattergl(
+            x=x_ax, y=decay_equity_stressed, mode="lines",
+            name="With 16% Edge Decay", line=dict(color="#f97316", width=2),
+        ))
+        fig_decay.update_layout(
+            plot_bgcolor="#1a1d23",
+            paper_bgcolor="#111317",
+            font=dict(family="Space Grotesk, sans-serif", color="#e0e4ec", size=13),
+            height=380,
+            margin=dict(l=60, r=30, t=50, b=50),
+            xaxis=dict(title="Trade Number", gridcolor="#2a2d35",
+                       title_font=dict(color="#e0e4ec"), tickfont=dict(color="#c9cdd5")),
+            yaxis=dict(title="Cumulative P&L", gridcolor="#2a2d35",
+                       zerolinecolor="#3a3f4b",
+                       title_font=dict(color="#e0e4ec"), tickfont=dict(color="#c9cdd5")),
+            legend=dict(orientation="h", yanchor="bottom", y=1.02,
+                        xanchor="center", x=0.5,
+                        font=dict(size=13, color="#e0e4ec"),
+                        bgcolor="rgba(0,0,0,0)"),
+            hovermode="x unified",
+        )
+        st.plotly_chart(fig_decay, use_container_width=True)
+
+        dr1, dr2, dr3 = st.columns(3)
+        net_diff_decay = decay_net - orig_net
+        with dr1:
+            st.markdown(f"""
+            <div class="metric-card">
+                <div class="metric-label">Original Net Profit</div>
+                <div class="metric-value {'positive' if orig_net >= 0 else 'negative'}">{fmt_human(orig_net)}</div>
+            </div>""", unsafe_allow_html=True)
+        with dr2:
+            st.markdown(f"""
+            <div class="metric-card">
+                <div class="metric-label">Decayed Net Profit</div>
+                <div class="metric-value {'positive' if decay_net >= 0 else 'negative'}">{fmt_human(decay_net)}</div>
+            </div>""", unsafe_allow_html=True)
+        with dr3:
+            st.markdown(f"""
+            <div class="metric-card">
+                <div class="metric-label">Profit Lost to Decay</div>
+                <div class="metric-value negative">{fmt_human(net_diff_decay)}</div>
+            </div>""", unsafe_allow_html=True)
+
+        # =================================================================
+        # MODULE 5 — STRESS SUMMARY TABLE
+        # =================================================================
+        st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
+        st.markdown(
+            '<div class="section-title" style="font-size: 18px;">Stress Summary &mdash; Scenario Comparison</div>',
+            unsafe_allow_html=True,
+        )
+
+        st.markdown(
+            '<div class="info-box">'
+            'Side-by-side comparison of your <strong>Current Backtest</strong> against '
+            'the Friction Stress and Edge Decay scenarios. The scenario causing the '
+            'largest deviation is highlighted.'
+            '</div>',
+            unsafe_allow_html=True,
+        )
+
+        # Determine which scenario causes the largest deviation from original net profit
+        fric_deviation = abs(orig_net - fric_net)
+        decay_deviation = abs(orig_net - decay_net)
+        worst_scenario = "Friction Stress" if fric_deviation >= decay_deviation else "Edge Decay"
+
+        def fmt_pf(pf):
+            return f"{pf:.2f}" if pf != float("inf") else "INF"
+
+        # Build table as styled HTML
+        highlight_fric = "border: 2px solid #f87171;" if worst_scenario == "Friction Stress" else ""
+        highlight_decay = "border: 2px solid #f87171;" if worst_scenario == "Edge Decay" else ""
+
+        summary_html = f"""
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-top: 16px;">
+            <div class="kelly-card">
+                <div class="kelly-header" style="color: #60a5fa;">Current Backtest</div>
+                <div class="kelly-sub">Baseline (no stress applied)</div>
+                <div style="margin-top: 14px;">
+                    <div class="stat-row">
+                        <span class="stat-label">Profit Factor</span>
+                        <span class="stat-value">{fmt_pf(orig_pf)}</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Expectancy</span>
+                        <span class="stat-value" style="color: {'#4ade80' if orig_exp >= 0 else '#f87171'};">
+                            {fmt_human(orig_exp)}</span>
+                    </div>
+                    <div class="stat-row" style="border-bottom: none;">
+                        <span class="stat-label">Net Profit</span>
+                        <span class="stat-value" style="color: {'#4ade80' if orig_net >= 0 else '#f87171'};">
+                            {fmt_human(orig_net)}</span>
+                    </div>
+                </div>
+            </div>
+            <div class="kelly-card" style="{highlight_fric}">
+                <div class="kelly-header" style="color: #fbbf24;">Friction Stress (4%)</div>
+                <div class="kelly-sub">Slippage penalty on every trade</div>
+                <div style="margin-top: 14px;">
+                    <div class="stat-row">
+                        <span class="stat-label">Profit Factor</span>
+                        <span class="stat-value">{fmt_pf(fric_pf)}</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Expectancy</span>
+                        <span class="stat-value" style="color: {'#4ade80' if fric_exp >= 0 else '#f87171'};">
+                            {fmt_human(fric_exp)}</span>
+                    </div>
+                    <div class="stat-row" style="border-bottom: none;">
+                        <span class="stat-label">Net Profit</span>
+                        <span class="stat-value" style="color: {'#4ade80' if fric_net >= 0 else '#f87171'};">
+                            {fmt_human(fric_net)}</span>
+                    </div>
+                </div>
+            </div>
+            <div class="kelly-card" style="{highlight_decay}">
+                <div class="kelly-header" style="color: #f97316;">Edge Decay (16%)</div>
+                <div class="kelly-sub">Haircut on all winning trades</div>
+                <div style="margin-top: 14px;">
+                    <div class="stat-row">
+                        <span class="stat-label">Profit Factor</span>
+                        <span class="stat-value">{fmt_pf(decay_pf)}</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Expectancy</span>
+                        <span class="stat-value" style="color: {'#4ade80' if decay_exp >= 0 else '#f87171'};">
+                            {fmt_human(decay_exp)}</span>
+                    </div>
+                    <div class="stat-row" style="border-bottom: none;">
+                        <span class="stat-label">Net Profit</span>
+                        <span class="stat-value" style="color: {'#4ade80' if decay_net >= 0 else '#f87171'};">
+                            {fmt_human(decay_net)}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div style="margin-top: 16px; padding: 14px 20px; background: #1a1d23;
+            border: 1px solid #22252b; border-left: 3px solid #f87171;
+            border-radius: 8px; font-size: 14px; color: #c9cdd5;">
+            <strong style="color: #f87171;">Largest deviation:</strong>
+            <strong>{worst_scenario}</strong> causes the biggest impact —
+            net profit drops by <span style="font-family: JetBrains Mono, monospace;
+            color: #f87171;">{fmt_human(max(fric_deviation, decay_deviation))}</span>
+            from the original backtest
+            ({((max(fric_deviation, decay_deviation) / abs(orig_net)) * 100) if orig_net != 0 else 0:,.1f}% deviation).
+        </div>
+        """
+        st.markdown(summary_html, unsafe_allow_html=True)
+
+
 # =========================================================================
 # FOOTER
 # =========================================================================
@@ -1345,6 +1868,6 @@ st.markdown(
     '<p style="text-align:center; color:#3a3f4b; font-size:12px; '
     'font-family: Space Grotesk, sans-serif; letter-spacing: 0.5px;">'
     'Quantitative Trading Lab &middot; Monte Carlo &middot; '
-    'Kelly Criterion &middot; Value at Risk</p>',
+    'Kelly Criterion &middot; Value at Risk &middot; Risk Laboratory</p>',
     unsafe_allow_html=True,
 )
